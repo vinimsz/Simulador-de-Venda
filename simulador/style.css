@@ -227,12 +227,13 @@ input:checked + .slider:before {
     border-bottom: 2px solid var(--pos-bg);
 }
 
+/* ================= Apagar dps ================= */
 .modal-title::before {
     content: "";
     display: block;
     width: 40px;
     height: 4px;
-    background: #E0E0E0;
+    background: #ffffff;
     margin: 0 auto 16px auto;
     border-radius: 2px;
 }
@@ -315,3 +316,23 @@ input:checked + .slider:before {
 .res-receber-label { font-size: 13px; color: var(--text-gray); }
 .res-valor-parcela { font-weight: bold; font-size: 15px; }
 .res-valor-liquido { font-size: 13px; color: var(--stone-green); }
+
+/* ================= ARRASTAR MODAL ================= */
+.drag-handle {
+  width: 40px;
+  height: 5px;
+  background-color: #e0e0e0;
+  border-radius: 10px;
+  margin: 12px auto 8px auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.modal-content {
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  touch-action: none;
+}
