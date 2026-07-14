@@ -1,338 +1,287 @@
-:root {
-    --stone-green: #00B259;
-    --stone-dark: #00964b;
-    --pos-bg: #F5F5F5;
-    --text-dark: #333333;
-    --text-gray: #757575;
-    --border-light: #E0E0E0;
-    --device-green: #7ED321;
+// BANCO DE DADOS DE TAXAS ATUALIZADO (Fatores exatos baseados na simulação de R$ 3.000,00)
+const TAXAS_POR_BANDEIRA = {
+    'MASTERCARD': {
+        debito: 0.0089,         // 0,89%
+        credito_avista: 0.0328, // 3,28%
+        credito_parcelado: { 
+            2: 0.03948, 3: 0.04679, 4: 0.05400, 5: 0.06119, 6: 0.06840, 
+            7: 0.07719, 8: 0.08438, 9: 0.09159, 10: 0.09877, 11: 0.10599, 
+            12: 0.11319, 13: 0.12038, 14: 0.12757, 15: 0.13480, 16: 0.1490, 
+            17: 0.14917, 18: 0.15637 
+        }
+    },
+    'VISA': {
+        debito: 0.0089,
+        credito_avista: 0.0328,
+        credito_parcelado: { 
+            2: 0.03948, 3: 0.04679, 4: 0.05400, 5: 0.06119, 6: 0.06840, 
+            7: 0.07719, 8: 0.08438, 9: 0.09159, 10: 0.09877, 11: 0.10599, 
+            12: 0.11319, 13: 0.12038, 14: 0.12757, 15: 0.13480, 16: 0.1490, 
+            17: 0.14917, 18: 0.15637 
+        }
+    },
+    'ELO': {
+        debito: 0.01690,
+        credito_avista: 0.04120,
+        credito_parcelado: { 2: 0.05220, 3: 0.05929, 4: 0.06640, 5: 0.07349, 6: 0.08070, 
+            7: 0.09209, 8: 0.09919, 9: 0.10630, 10: 0.11340, 11: 0.12049, 
+            12: 0.12758, 13: 0.13469, 14: 0.14169, 15: 0.14879, 16: 0.15590, 
+            17: 0.16297, 18: 0.17007 }
+    },
+    'AMERICAN EXPRESS': {
+        debito: 0.0000,
+        credito_avista: 0.04170,
+        credito_parcelado: {  2: 0.04960, 3: 0.05680, 4: 0.06389, 5: 0.06676, 6: 0.07819, 
+            7: 0.08649, 8: 0.09359, 9: 0.10116, 10: 0.10789, 11: 0.11498, 
+            12: 0.12210 }
+    }
+};
+
+const BANDEIRAS = Object.keys(TAXAS_POR_BANDEIRA);
+
+const MODALIDADES = [
+    { id: 'debito', label: 'Débito', parcelas: [1] },
+    { id: 'credito_1_4', label: 'Crédito à vista a 4X', parcelas: [1,2,3,4] },
+    { id: 'credito_5_8', label: 'Crédito 5X a 8X', parcelas: [5,6,7,8] },
+    { id: 'credito_9_12', label: 'Crédito 9X a 12X', parcelas: [9,10,11,12] },
+    { id: 'credito_13_18', label: 'Crédito 13X a 18X', parcelas: [13,14,15,16,17,18] }
+];
+
+let estado = {
+    valor: 0,
+    bandeira: null,
+    modalidadeObj: null,
+    integral: false
+};
+
+// Formata valores numéricos para exibição em texto (ex: resultados)
+function formatarMoeda(valor) {
+    return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: Roboto, Arial, sans-serif;
-    -webkit-tap-highlight-color: transparent;
+// Formata a digitação do usuário em tempo real
+function mascaraMoeda(input) {
+    let valor = input.value;
+
+    // Remove tudo que não for número
+    valor = valor.replace(/\D/g, "");
+
+    if (valor === "") {
+        input.value = "";
+        return;
+    }
+
+    // Move a vírgula para simular centavos (ex: 3 vira 0.03, 30 vira 0.30)
+    const valorNumerico = parseInt(valor, 10) / 100;
+
+    // Formata no padrão brasileiro
+    input.value = valorNumerico.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
 }
 
-body {
-    background-color: #222;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
+function validarBotao() {
+    const rawValue = document.getElementById('inputValor').value;
+    
+    // Converte a máscara "3.000,00" de volta para o número real float 3000.00
+    const val = parseFloat(rawValue.replace(/\./g, '').replace(',', '.')) || 0;
+    
+    estado.valor = val;
+    estado.integral = document.getElementById('toggleIntegral').checked;
+    
+    const btn = document.getElementById('btnSimular');
+    if (estado.valor > 0 && estado.bandeira && estado.modalidadeObj) {
+        btn.classList.add('active');
+    } else {
+        btn.classList.remove('active');
+    }
 }
 
-.device {
-    width: 360px;
-    height: 640px;
-    background-color: var(--device-green);
-    border-radius: 40px;
-    padding: 20px 10px 40px 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    position: relative;
-    overflow: hidden;
+function abrirModal(tipo) {
+    const overlay = document.getElementById('modalOverlay');
+    const title = document.getElementById('modalTitle');
+    const list = document.getElementById('modalList');
+    
+    list.innerHTML = '';
+    overlay.style.display = 'flex';
+
+    if (tipo === 'bandeira') {
+        title.innerText = 'Bandeira';
+        BANDEIRAS.forEach(b => {
+            const isSelected = estado.bandeira === b;
+            list.innerHTML += `
+                <div class="modal-list-item ${isSelected ? 'selected' : ''}" onclick="selecionarBandeira('${b}')">
+                    <div class="radio-circle"></div>
+                    <span>${b}</span>
+                </div>`;
+        });
+    } else if (tipo === 'modalidade') {
+        title.innerText = 'Modalidade';
+        MODALIDADES.forEach(m => {
+            const isSelected = estado.modalidadeObj && estado.modalidadeObj.id === m.id;
+            list.innerHTML += `
+                <div class="modal-list-item ${isSelected ? 'selected' : ''}" onclick="selecionarModalidade('${m.id}')">
+                    <div class="radio-circle"></div>
+                    <span>${m.label}</span>
+                </div>`;
+        });
+    }
 }
 
-.screen {
-    width: 100%;
-    height: 100%;
-    background-color: var(--pos-bg);
-    border-radius: 20px;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    overflow: hidden;
+function fecharModal(e) {
+    if(e) e.stopPropagation();
+    document.getElementById('modalOverlay').style.display = 'none';
 }
 
-.header {
-    background-color: #FFF;
-    border-bottom: 1px solid var(--border-light);
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-weight: bold;
-    font-size: 14px;
-    color: var(--text-dark);
+function selecionarBandeira(b) {
+    estado.bandeira = b;
+    document.getElementById('lblBandeira').innerText = b;
+    document.getElementById('lblBandeira').style.color = '#333';
+    fecharModal();
+    validarBotao();
 }
 
-.header-icon {
-    font-size: 20px;
-    cursor: pointer;
-    color: var(--text-gray);
+function selecionarModalidade(id) {
+    const mod = MODALIDADES.find(m => m.id === id);
+    estado.modalidadeObj = mod;
+    document.getElementById('lblModalidade').innerText = mod.label;
+    document.getElementById('lblModalidade').style.color = '#333';
+    fecharModal();
+    validarBotao();
 }
 
-.main-content {
-    flex: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
+function simular() {
+    if (!estado.valor || !estado.bandeira || !estado.modalidadeObj) return;
+
+    estado.integral = document.getElementById('toggleIntegral').checked;
+    document.getElementById('toggleIntegralResult').checked = estado.integral;
+
+    renderizarResultados();
+
+    document.getElementById('formView').style.display = 'none';
+    document.getElementById('resultView').style.display = 'flex';
 }
 
-.value-display {
-    background-color: #E8ECEE;
-    padding: 24px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 32px;
-    color: var(--text-dark);
-    border-bottom: 1px solid var(--border-light);
+function sincronizarToggle() {
+    estado.integral = document.getElementById('toggleIntegralResult').checked;
+    document.getElementById('toggleIntegral').checked = estado.integral;
+    renderizarResultados();
 }
 
-.value-display span.currency {
-    color: var(--text-gray);
-    font-size: 24px;
+function renderizarResultados() {
+    document.getElementById('resValorTopo').innerText = formatarMoeda(estado.valor);
+    const lista = document.getElementById('listaParcelas');
+    lista.innerHTML = '';
+
+    const mod = estado.modalidadeObj;
+    const taxasBandeira = TAXAS_POR_BANDEIRA[estado.bandeira];
+
+    mod.parcelas.forEach(p => {
+        let taxa = 0;
+        if (mod.id === 'debito') {
+            taxa = taxasBandeira.debito;
+        } else if (p === 1) {
+            taxa = taxasBandeira.credito_avista;
+        } else {
+            taxa = taxasBandeira.credito_parcelado[p];
+        }
+
+        let bruto, liquido, parcelaVal;
+
+        if (estado.integral) {
+            liquido = estado.valor;
+            bruto = liquido / (1 - taxa);
+            parcelaVal = bruto / p;
+        } else {
+            bruto = estado.valor;
+            liquido = bruto - (bruto * taxa);
+            parcelaVal = bruto / p;
+        }
+
+        lista.innerHTML += `
+            <div class="result-item">
+                <div class="result-col-left">
+                    <span class="res-parcela">${p}x de</span>
+                    <span class="res-receber-label">${estado.integral ? 'Cliente paga (Total: R$ ' + formatarMoeda(bruto) + ')' : 'Vou receber'}</span>
+                </div>
+                <div class="result-col-right">
+                    <span class="res-valor-parcela">R$ ${formatarMoeda(parcelaVal)}</span>
+                    <span class="res-valor-liquido">R$ ${formatarMoeda(liquido)}</span>
+                </div>
+            </div>
+        `;
+    });
 }
 
-.value-display input {
-    background: transparent;
-    border: none;
-    outline: none;
-    font-size: 36px;
-    text-align: right;
-    width: 100%;
-    color: var(--text-dark);
+function voltar() {
+    document.getElementById('resultView').style.display = 'none';
+    document.getElementById('formView').style.display = 'flex';
 }
 
-.menu-list {
-    background-color: #FFF;
-}
+// ================= LÓGICA PARA ARRASTAR O MODAL PARA BAIXO =================
+const modalContent = document.getElementById('modalContent');
+const dragHandle = document.getElementById('dragHandle');
+const modalOverlay = document.getElementById('modalOverlay');
 
-.menu-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px;
-    border-bottom: 1px solid var(--border-light);
-    cursor: pointer;
-}
+let startY = 0;
+let currentY = 0;
+let isDragging = false;
 
-.menu-item.no-click {
-    cursor: default;
-}
+if (dragHandle && modalContent && modalOverlay) {
+    
+    dragHandle.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        startY = e.clientY;
+        modalContent.style.transition = 'none';
+        dragHandle.setPointerCapture(e.pointerId);
+    });
 
-.menu-item-title {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--text-dark);
-}
+    dragHandle.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        
+        const deltaY = e.clientY - startY;
+        
+        if (deltaY > 0) {
+            modalContent.style.transform = `translateY(${deltaY}px)`;
+            currentY = deltaY;
+        }
+    });
 
-.menu-item-subtitle {
-    font-size: 12px;
-    color: var(--text-gray);
-    margin-top: 4px;
-}
+    dragHandle.addEventListener('pointerup', (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        dragHandle.releasePointerCapture(e.pointerId);
+        
+        modalContent.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+        
+        if (currentY > 120) {
+            modalContent.style.transform = 'translateY(100%)';
+            
+            setTimeout(() => {
+                modalOverlay.click();
+                modalContent.style.transform = '';
+                modalContent.style.transition = '';
+            }, 300);
+        } else {
+            modalContent.style.transform = 'translateY(0)';
+            
+            setTimeout(() => {
+                if (!isDragging) {
+                    modalContent.style.transform = '';
+                    modalContent.style.transition = '';
+                }
+            }, 300);
+        }
+        
+        currentY = 0;
+    });
 
-.menu-item-value {
-    font-size: 14px;
-    color: var(--text-gray);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 24px;
-}
-
-.switch input { 
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-color: #ccc;
-    transition: .4s;
-    border-radius: 34px;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 20px;
-    width: 20px;
-    left: 2px;
-    bottom: 2px;
-    background-color: white;
-    transition: .4s;
-    border-radius: 50%;
-}
-
-input:checked + .slider {
-    background-color: var(--stone-green);
-}
-
-input:checked + .slider:before {
-    transform: translateX(20px);
-}
-
-.footer {
-    padding: 16px;
-    background-color: var(--pos-bg);
-}
-
-.btn {
-    width: 100%;
-    padding: 16px;
-    background-color: #A3D4B6;
-    color: #FFF;
-    border: none;
-    border-radius: 24px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-.btn.active {
-    background-color: var(--stone-green);
-}
-
-.modal-overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.5);
-    display: none;
-    justify-content: center;
-    align-items: flex-end;
-    z-index: 10;
-}
-
-.modal-content {
-    background: #FFF;
-    width: 100%;
-    border-radius: 20px 20px 0 0;
-    padding: 20px 0 0 0;
-    max-height: 70%;
-    display: flex;
-    flex-direction: column;
-}
-
-.modal-title {
-    padding: 0 20px 16px 20px;
-    font-weight: bold;
-    text-transform: uppercase;
-    font-size: 14px;
-    color: var(--text-dark);
-    border-bottom: 2px solid var(--pos-bg);
-}
-
-/* ================= Apagar dps ================= */
-.modal-title::before {
-    content: "";
-    display: block;
-    width: 40px;
-    height: 4px;
-    background: #ffffff;
-    margin: 0 auto 16px auto;
-    border-radius: 2px;
-}
-
-.modal-list {
-    overflow-y: auto;
-}
-
-.modal-list-item {
-    padding: 16px 20px;
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border-bottom: 1px solid var(--pos-bg);
-    cursor: pointer;
-}
-
-.radio-circle {
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--text-gray);
-    border-radius: 50%;
-    display: inline-block;
-}
-
-.modal-list-item.selected .radio-circle {
-    border-color: var(--stone-green);
-    background: radial-gradient(circle, var(--stone-green) 40%, transparent 50%);
-}
-
-#resultView {
-    display: none;
-    flex-direction: column;
-    height: 100%;
-}
-
-.result-header {
-    padding: 20px;
-    background-color: #FFF;
-    text-align: center;
-    border-bottom: 1px solid var(--border-light);
-}
-
-.result-title {
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 8px;
-}
-
-.result-list {
-    flex: 1;
-    overflow-y: auto;
-    background: #FFF;
-    margin-top: 8px;
-}
-
-.result-item {
-    padding: 16px;
-    border-bottom: 1px solid var(--border-light);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.result-col-left {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.result-col-right {
-    text-align: right;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.res-parcela { font-weight: bold; font-size: 15px; }
-.res-receber-label { font-size: 13px; color: var(--text-gray); }
-.res-valor-parcela { font-weight: bold; font-size: 15px; }
-.res-valor-liquido { font-size: 13px; color: var(--stone-green); }
-
-/* ================= ARRASTAR MODAL ================= */
-.drag-handle {
-  width: 40px;
-  height: 5px;
-  background-color: #e0e0e0;
-  border-radius: 10px;
-  margin: 12px auto 8px auto;
-  cursor: grab;
-  touch-action: none;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.modal-content {
-  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  touch-action: none;
+    dragHandle.addEventListener('pointercancel', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        modalContent.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+        modalContent.style.transform = '';
+        currentY = 0;
+    });
 }
