@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simulador POS Stone</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="device">
+    <div class="screen">
+
+        <!-- TELA PRINCIPAL -->
+        <div id="formView" class="main-content" style="display:flex;">
+
+            <div class="header">
+                <span class="header-icon">←</span>
+                <span>SIMULADOR DE VENDAS</span>
+                <span class="header-icon">?</span>
+            </div>
+
+            <div class="value-display">
+                <span class="currency">R$</span>
+
+                <input
+                    type="number"
+                    id="inputValor"
+                    placeholder="0,00"
+                    min="0"
+                    step="0.01"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    oninput="validarBotao()">
+            </div>
+
+            <div class="menu-list">
+
+                <div class="menu-item" onclick="abrirModal('bandeira')">
+                    <span class="menu-item-title">Bandeira</span>
+
+                    <span class="menu-item-value">
+                        <span id="lblBandeira">Selecionar</span>
+                        ❯
+                    </span>
+                </div>
+
+                <div class="menu-item" onclick="abrirModal('modalidade')">
+                    <span class="menu-item-title">Modalidade</span>
+
+                    <span class="menu-item-value">
+                        <span id="lblModalidade">Selecionar</span>
+                        ❯
+                    </span>
+                </div>
+
+                <div class="menu-item no-click">
+                    <div>
+                        <div class="menu-item-title">
+                            Quero receber o valor integral
+                        </div>
+
+                        <div class="menu-item-subtitle">
+                            Simule o valor que deseja receber
+                        </div>
+                    </div>
+
+                    <label class="switch">
+                        <input
+                            type="checkbox"
+                            id="toggleIntegral"
+                            onchange="validarBotao()">
+
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="menu-item">
+                    <span class="menu-item-title">
+                        Antecipação
+                    </span>
+
+                    <span class="menu-item-value">
+                        Automática ❯
+                    </span>
+                </div>
+
+            </div>
+
+            <div style="flex:1;"></div>
+
+            <div class="footer">
+                <button
+                    id="btnSimular"
+                    class="btn"
+                    onclick="simular()">
+
+                    Simular venda
+
+                </button>
+            </div>
+
+        </div>
+
+        <!-- RESULTADO -->
+        <div id="resultView" style="display:none; flex-direction:column; height:100%;">
+
+            <div class="header">
+                <span class="header-icon" onclick="voltar()">←</span>
+                <span>SIMULADOR DE VENDAS</span>
+                <span class="header-icon">?</span>
+            </div>
+
+            <div class="result-header">
+
+                <div class="result-title">
+                    Valor simulado:
+                    <strong>
+                        R$
+                        <span id="resValorTopo">0,00</span>
+                    </strong>
+                </div>
+
+            </div>
+
+            <div class="menu-list">
+
+                <div class="menu-item no-click">
+
+                    <div>
+
+                        <div class="menu-item-title">
+                            Quero receber o valor integral
+                        </div>
+
+                        <div class="menu-item-subtitle">
+                            Simule o valor que deseja receber
+                        </div>
+
+                    </div>
+
+                    <label class="switch">
+
+                        <input
+                            type="checkbox"
+                            id="toggleIntegralResult"
+                            onchange="sincronizarToggle()">
+
+                        <span class="slider"></span>
+
+                    </label>
+
+                </div>
+
+            </div>
+
+            <div
+                class="result-list"
+                id="listaParcelas">
+            </div>
+
+        </div>
+
+        <!-- MODAL -->
+        <div
+            class="modal-overlay"
+            id="modalOverlay"
+            onclick="fecharModal(event)">
+
+            <div
+                class="modal-content"
+                onclick="event.stopPropagation()">
+
+                <div
+                    class="modal-title"
+                    id="modalTitle">
+                    Título
+                </div>
+
+                <div
+                    class="modal-list"
+                    id="modalList">
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
